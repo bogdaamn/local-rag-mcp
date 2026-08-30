@@ -35,6 +35,9 @@ def chunk_documents(documents):
                 "chunk_id": idx
             })
 
+    for global_id, chunk in enumerate(all_chunks):
+        chunk["id"] = global_id  # globally unique, used by FAISS + FTS + RRF
+
     return all_chunks
 
 

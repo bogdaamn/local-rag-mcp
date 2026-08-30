@@ -28,3 +28,16 @@ def test_vector_search_returns_empty_list_when_index_not_loaded(monkeypatch):
     monkeypatch.setattr(query, "chunks", [])
 
     assert query._vector_search("cats", top_k=5) == []
+
+
+def test_hybrid_search_task_fuses_per_variant_rankings():
+    calls = []
+
+    def fake_search_fn(variant, top_k):
+        calls.append((variant, top_k))
+        return {"cats": [1, 2, 3], "kittens": [2, 1, 4]}[variant]
+
+    result = query._hybrid_search_task(fake_search_fn, ["cats", "kittens"], top_k=10, rrf_k=60)
+
+    assert calls == [("cats", 10), ("kittens", 10)]
+    assert result == [1, 2, 3, 4]

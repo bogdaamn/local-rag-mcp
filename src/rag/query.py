@@ -15,6 +15,7 @@ from config import (
     OLLAMA_MODEL,
     TOP_K
 )
+from rag.fusion import rrf_fuse
 
 model = SentenceTransformer(EMBEDDING_MODEL)
 
@@ -83,6 +84,13 @@ def _vector_search(query, top_k):
     faiss.normalize_L2(q_emb)
     scores, ids = index.search(q_emb, top_k)
     return [int(i) for i in ids[0] if i != -1]
+
+
+def _hybrid_search_task(search_fn, variants, top_k, rrf_k):
+    """Run search_fn(variant, top_k) for every variant, collect each result
+    as one ranked list, and rrf_fuse() them into a single ranking."""
+    per_variant_rankings = [search_fn(variant, top_k) for variant in variants]
+    return rrf_fuse(per_variant_rankings, k=rrf_k)
 
 
 def retrieve(query: str):

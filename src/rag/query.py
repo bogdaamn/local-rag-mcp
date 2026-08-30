@@ -73,16 +73,28 @@ def _ensure_index_exists():
 _ensure_index_exists()
 
 
+def _vector_search(query, top_k):
+    """Encode `query`, normalize, search the FAISS index, return up to
+    top_k chunk ids best-first. [] if index/chunks aren't loaded."""
+    if index is None or len(chunks) == 0:
+        return []
+
+    q_emb = model.encode([query])
+    faiss.normalize_L2(q_emb)
+    scores, ids = index.search(q_emb, top_k)
+    return [int(i) for i in ids[0] if i != -1]
+
+
 def retrieve(query: str):
     """Retrieve relevant chunks for a query."""
     # Ensure index exists before retrieving
     if index is None or len(chunks) == 0:
         if not _ensure_index_exists():
             return []
-    
+
     if index is None or len(chunks) == 0:
         return []
-    
+
     q_emb = model.encode([query])
     faiss.normalize_L2(q_emb)
 

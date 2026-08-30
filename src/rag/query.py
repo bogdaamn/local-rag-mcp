@@ -13,48 +13,61 @@ from config import (
     EMBEDDING_MODEL,
     OLLAMA_URL,
     OLLAMA_MODEL,
-    TOP_K
+    TOP_K,
+    FTS_DB_PATH,
+    RRF_K,
+    NUM_QUERY_EXPANSIONS,
+    CANDIDATE_K,
 )
 from rag.fusion import rrf_fuse
+from rag.fts_index import search_fts
+from rag.expand import generate_keywords
+from concurrent.futures import ThreadPoolExecutor
 
 model = SentenceTransformer(EMBEDDING_MODEL)
+
+src_dir = Path(__file__).parent.parent
+fts_db_path = src_dir / FTS_DB_PATH
 
 # Global variables for index and chunks
 index = None
 chunks = []
+chunks_by_id = {}
 
 
 def _ensure_index_exists():
     """Ensure FAISS index exists, build it if it doesn't."""
-    global index, chunks
-    
+    global index, chunks, chunks_by_id
+
     # Resolve paths relative to src directory
     src_dir = Path(__file__).parent.parent
     index_path = src_dir / FAISS_INDEX_PATH
     chunks_path = src_dir / CHUNKS_PATH
-    
+
     # Check if index exists
     if index_path.exists() and chunks_path.exists():
         try:
             index = faiss.read_index(str(index_path))
             with open(chunks_path, "rb") as f:
                 chunks = pickle.load(f)
+            chunks_by_id = {c["id"]: c for c in chunks}
             return True
         except Exception as e:
             print(f"⚠️  Warning: Error loading existing index: {e}")
             print("Rebuilding index...")
-    
+
     # Index doesn't exist or failed to load, build it
     print("📦 Index not found. Building index from documents...")
     try:
         from rag.build_index import build_index
         build_index()
-        
+
         # Load the newly created index
         if index_path.exists() and chunks_path.exists():
             index = faiss.read_index(str(index_path))
             with open(chunks_path, "rb") as f:
                 chunks = pickle.load(f)
+            chunks_by_id = {c["id"]: c for c in chunks}
             print("✅ Index built and loaded successfully")
             return True
         else:
@@ -93,9 +106,8 @@ def _hybrid_search_task(search_fn, variants, top_k, rrf_k):
     return rrf_fuse(per_variant_rankings, k=rrf_k)
 
 
-def retrieve(query: str):
-    """Retrieve relevant chunks for a query."""
-    # Ensure index exists before retrieving
+def retrieve(query):
+    """Hybrid retrieval: query expansion -> parallel vector+FTS -> RRF fusion."""
     if index is None or len(chunks) == 0:
         if not _ensure_index_exists():
             return []
@@ -103,11 +115,24 @@ def retrieve(query: str):
     if index is None or len(chunks) == 0:
         return []
 
-    q_emb = model.encode([query])
-    faiss.normalize_L2(q_emb)
+    keywords = generate_keywords(query)
+    variants = [query] + keywords[:NUM_QUERY_EXPANSIONS]
 
-    scores, ids = index.search(q_emb, TOP_K)
-    return [chunks[i] for i in ids[0]]
+    def fts_search_fn(variant, top_k):
+        return search_fts(fts_db_path, variant, top_k)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        vector_future = executor.submit(
+            _hybrid_search_task, _vector_search, variants, CANDIDATE_K, RRF_K
+        )
+        fts_future = executor.submit(
+            _hybrid_search_task, fts_search_fn, variants, CANDIDATE_K, RRF_K
+        )
+        vector_fused = vector_future.result()
+        fts_fused = fts_future.result()
+
+    final_ids = rrf_fuse([vector_fused, fts_fused], k=RRF_K)[:TOP_K]
+    return [chunks_by_id[i] for i in final_ids if i in chunks_by_id]
 
 
 def build_prompt(query, contexts):

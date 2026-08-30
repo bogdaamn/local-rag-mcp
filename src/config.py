@@ -20,3 +20,9 @@ OLLAMA_MODEL = "qwen3:0.6b"
 
 # RAG retrieval configuration
 TOP_K = 5
+
+# Hybrid search configuration
+FTS_DB_PATH = "fts.db"          # relative to src dir, mirrors FAISS_INDEX_PATH
+RRF_K = 60                       # RRF constant k, per assignment's formula
+NUM_QUERY_EXPANSIONS = 3         # max alternative phrases the LLM may produce
+CANDIDATE_K = TOP_K * 3          # candidate pool size per method, before fusion

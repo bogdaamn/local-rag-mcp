@@ -40,6 +40,16 @@ def search_fts(fts_db_path, query, top_k):
 
     conn = sqlite3.connect(str(fts_db_path))
     try:
+        table_exists = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'"
+        ).fetchone()
+        if not table_exists:
+            print(
+                f"⚠️  FTS index not found at {fts_db_path} — "
+                "falling back to vector search only"
+            )
+            return []
+
         cursor = conn.execute(
             "SELECT id FROM chunks_fts WHERE chunks_fts MATCH ? "
             "ORDER BY bm25(chunks_fts) LIMIT ?",
@@ -47,6 +57,8 @@ def search_fts(fts_db_path, query, top_k):
         )
         return [row[0] for row in cursor.fetchall()]
     except sqlite3.OperationalError:
+        # A malformed MATCH expression (e.g. an unbalanced quote after
+        # sanitization) should degrade gracefully, not raise.
         return []
     finally:
         conn.close()

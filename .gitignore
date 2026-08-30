@@ -165,6 +165,10 @@ index.faiss
 *.pkl
 chunks.pkl
 
+# FTS5 SQLite index (full document text)
+*.db
+fts.db
+
 # Model files (if storing locally)
 *.bin
 *.safetensors

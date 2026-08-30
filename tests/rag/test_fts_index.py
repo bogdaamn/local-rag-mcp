@@ -66,3 +66,14 @@ def test_search_fts_returns_empty_list_on_malformed_query_instead_of_raising(tmp
     build_fts_index([{"id": 1, "text": "hello world"}], fts_db_path)
 
     assert search_fts(fts_db_path, '"', top_k=10) == []
+
+
+def test_search_fts_warns_and_returns_empty_list_when_index_missing(tmp_path, capsys):
+    fts_db_path = tmp_path / "fts.db"  # never built - no chunks_fts table
+
+    result = search_fts(fts_db_path, "invoice", top_k=10)
+
+    assert result == []
+    captured = capsys.readouterr()
+    assert str(fts_db_path) in captured.out
+    assert "not found" in captured.out.lower()

@@ -125,16 +125,17 @@ def build_prompt(query, contexts):
 """
 
 
-def ask_llm(prompt):
-    """Query Ollama LLM."""
-    response = requests.post(
-        OLLAMA_URL,
-        json={
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False
-        }
-    )
+def ask_llm(prompt, temperature=None, timeout=None):
+    """Query Ollama LLM.
+
+    temperature: if not None, sent as {"options": {"temperature": temperature}}.
+    timeout: if not None, passed as requests.post(..., timeout=timeout).
+             If None, blocks indefinitely (unchanged existing behavior).
+    """
+    payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}
+    if temperature is not None:
+        payload["options"] = {"temperature": temperature}
+    response = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
     return response.json()["response"]
 
 

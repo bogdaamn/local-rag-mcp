@@ -4,20 +4,28 @@ Run these commands in order to set up and use the Company Knowledge Base Assista
 
 ## Quick start/stop (recommended)
 
-From the repo root, `./local-rag` handles the venv, Ollama, model pull, and
-index build for you:
+`scripts/start.sh` / `scripts/stop.sh` handle the venv, Ollama, model pull,
+and index build for you, and are wired up as `start local-rag` / `stop
+local-rag` shell functions (see the block appended to `~/.zshrc` — the same
+convention used by the sibling `larchanka-bot` project):
 
 ```bash
-./local-rag start   # sets everything up, then launches the interactive CLI
-./local-rag stop    # stops Ollama, but only if start actually started it
+start local-rag   # sets everything up, then launches the interactive CLI
+stop local-rag    # stops Ollama (frees the CPU/RAM its model was using)
 ```
 
-Exit the CLI itself with `exit`, `quit`, or Ctrl+C — `./local-rag stop` is
-only about the underlying Ollama model service, which otherwise keeps
-running in the background after you leave the CLI. If Ollama was already
-running before `start`, `stop` leaves it alone.
+Without that shell setup, run the scripts directly from the repo root:
 
-The manual steps below explain what `./local-rag` automates, and are useful
+```bash
+./scripts/start.sh
+./scripts/stop.sh
+```
+
+Exit the CLI itself with `exit`, `quit`, or Ctrl+C — `stop local-rag` is
+only about the underlying Ollama model service, which otherwise keeps
+running in the background after you leave the CLI.
+
+The manual steps below explain what `scripts/start.sh` automates, and are useful
 if you want to run any of them individually.
 
 ## Prerequisites

@@ -11,10 +11,15 @@ import rag.query as rag_query
 
 # Each entry: a query designed to be hard for embeddings (rare terms, exact
 # file/command names, abbreviations), and the substring expected to appear
-# in a hit's source path/text. Populate once real documents exist in
-# DOCUMENTS_DIR — this list ships empty since src/docs/ is currently empty.
+# in a hit's source path/text. src/docs/ now has 4 CC BY-SA Wikipedia
+# extracts (bm25_ranking.txt, full_text_search.txt, sentence_embeddings.txt,
+# sqlite.txt) — rebuild the index first via `python main.py build-index`.
 SAMPLE_QUERIES = [
-    # {"query": "...", "expected_substring": "..."},
+    {"query": "avgdl", "expected_substring": "bm25_ranking.txt"},
+    {"query": "ROWID", "expected_substring": "sqlite.txt"},
+    {"query": "FTS5", "expected_substring": "sqlite.txt"},
+    {"query": "WAL", "expected_substring": "sqlite.txt"},
+    {"query": "Robertson", "expected_substring": "bm25_ranking.txt"},
 ]
 
 

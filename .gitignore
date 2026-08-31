@@ -169,6 +169,9 @@ chunks.pkl
 *.db
 fts.db
 
+# local-rag start/stop script state (Ollama pid/log)
+.local-rag/
+
 # Model files (if storing locally)
 *.bin
 *.safetensors

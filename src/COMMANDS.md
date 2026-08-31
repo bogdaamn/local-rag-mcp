@@ -2,6 +2,24 @@
 
 Run these commands in order to set up and use the Company Knowledge Base Assistant.
 
+## Quick start/stop (recommended)
+
+From the repo root, `./local-rag` handles the venv, Ollama, model pull, and
+index build for you:
+
+```bash
+./local-rag start   # sets everything up, then launches the interactive CLI
+./local-rag stop    # stops Ollama, but only if start actually started it
+```
+
+Exit the CLI itself with `exit`, `quit`, or Ctrl+C — `./local-rag stop` is
+only about the underlying Ollama model service, which otherwise keeps
+running in the background after you leave the CLI. If Ollama was already
+running before `start`, `stop` leaves it alone.
+
+The manual steps below explain what `./local-rag` automates, and are useful
+if you want to run any of them individually.
+
 ## Prerequisites
 
 1. **Install Python 3.10+** (if not already installed)

@@ -170,7 +170,8 @@ chunks.pkl
 fts.db
 
 # local-rag start/stop script state (Ollama pid/log)
-.local-rag/
+.ollama.pid
+ollama.log
 
 # Model files (if storing locally)
 *.bin

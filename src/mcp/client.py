@@ -1,7 +1,11 @@
 import json
 import subprocess
+import sys
 import threading
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from telemetry.tool_middleware import record_tool_call
 
 class MCPClient:
     """Client for communicating with MCP server."""
@@ -49,19 +53,21 @@ class MCPClient:
         return self._send(payload)
 
     def call_tool(self, name, arguments):
-        """Call an MCP tool."""
-        payload = {
-            "jsonrpc": "2.0",
-            "id": self.next_id,
-            "method": "tools/call",
-            "params": {
-                "name": name,
-                "arguments": arguments
+        """Call an MCP tool, recording telemetry for the call."""
+        def _do_call():
+            payload = {
+                "jsonrpc": "2.0",
+                "id": self.next_id,
+                "method": "tools/call",
+                "params": {
+                    "name": name,
+                    "arguments": arguments
+                }
             }
-        }
-        self.next_id += 1
+            self.next_id += 1
+            return self._send(payload)
 
-        return self._send(payload)
+        return record_tool_call(name, arguments, _do_call)
     
     def close(self):
         """Close the MCP connection."""

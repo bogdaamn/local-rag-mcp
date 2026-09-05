@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+, `sqlite3` (stdlib, FTS5), `faiss-cpu`, `concurrent.futures.ThreadPoolExecutor` (stdlib), `pytest>=7.4.0` (new dev dependency).
 
-**Spec:** `spec/SPEC.md` (this plan implements it section-by-section; read it first — this plan does not repeat its rationale, only its exact interfaces and the tests that pin them down).
+**Spec:** `spec/v1/SPEC.md` (this plan implements it section-by-section; read it first — this plan does not repeat its rationale, only its exact interfaces and the tests that pin them down).
 
 ## Global Constraints
 
@@ -1248,7 +1248,7 @@ def run_benchmark():
     if not SAMPLE_QUERIES:
         print(
             "No SAMPLE_QUERIES configured yet — add entries once documents "
-            "exist in DOCUMENTS_DIR (see spec/SPEC.md §9)."
+            "exist in DOCUMENTS_DIR (see spec/v1/SPEC.md §9)."
         )
         return
 

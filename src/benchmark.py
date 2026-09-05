@@ -37,7 +37,7 @@ def run_benchmark():
     if not SAMPLE_QUERIES:
         print(
             "No SAMPLE_QUERIES configured yet — add entries once documents "
-            "exist in DOCUMENTS_DIR (see spec/SPEC.md §9)."
+            "exist in DOCUMENTS_DIR (see spec/v1/SPEC.md §9)."
         )
         return
 

@@ -56,3 +56,19 @@ def test_output_size_is_byte_length_of_the_result_field_only(tmp_path):
     output_size = conn.execute("SELECT output_size FROM tool_calls").fetchone()[0]
     conn.close()
     assert output_size == len("found: vacation-policy.md".encode("utf-8"))
+
+
+def test_records_and_does_not_raise_when_no_ambient_task(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    context.current_task_id.set(None)
+
+    response = record_tool_call(
+        "list_documents", {}, lambda: {"result": "doc1\ndoc2"}, db_path=db_path,
+    )
+
+    assert response == {"result": "doc1\ndoc2"}
+
+    conn = sqlite3.connect(str(db_path))
+    task_id = conn.execute("SELECT task_id FROM tool_calls").fetchone()[0]
+    conn.close()
+    assert task_id == "unattributed"

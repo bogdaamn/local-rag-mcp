@@ -108,3 +108,21 @@ def test_records_reasoning_tokens_as_zero(tmp_path):
     reasoning = conn.execute("SELECT reasoning_tokens FROM llm_calls").fetchone()[0]
     conn.close()
     assert reasoning == 0
+
+
+def test_records_and_does_not_raise_when_no_ambient_task(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    context.current_task_id.set(None)
+
+    result = record_llm_call(
+        call_site="ask_llm", model="qwen3:0.6b", prompt="q",
+        temperature=None, fn=lambda: ("answer", 1, 1), db_path=db_path,
+    )
+
+    assert result == "answer"
+
+    import sqlite3
+    conn = sqlite3.connect(str(db_path))
+    task_id = conn.execute("SELECT task_id FROM llm_calls").fetchone()[0]
+    conn.close()
+    assert task_id == "unattributed"

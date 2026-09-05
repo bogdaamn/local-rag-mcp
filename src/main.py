@@ -6,8 +6,6 @@ Company Knowledge Base Assistant - Main Entry Point
 import argparse
 import sys
 
-from assistant import CompanyKBAssistant
-
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="main.py")
@@ -58,6 +56,7 @@ def _run_timeline(task_id):
 
 
 def _run_interactive():
+    from assistant import CompanyKBAssistant
     assistant = CompanyKBAssistant()
 
     print("=" * 60)

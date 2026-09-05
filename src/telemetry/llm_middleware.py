@@ -28,19 +28,23 @@ def record_llm_call(call_site, model, prompt, temperature, fn, db_path=None):
     latency_ms = (time.perf_counter() - start) * 1000
     estimated_cost = pricing.estimate_cost(model, input_tokens, output_tokens)
 
-    storage.insert_llm_call(
-        agent_id=context.current_agent_id.get(),
-        task_id=context.current_task_id.get(),
-        turn_number=context.current_turn_number.get(),
-        model=model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cached_tokens=cached_tokens,
-        reasoning_tokens=0,
-        latency_ms=latency_ms,
-        estimated_cost=estimated_cost,
-        call_site=call_site,
-        db_path=db_path,
-    )
+    try:
+        storage.insert_llm_call(
+            agent_id=context.current_agent_id.get(),
+            task_id=context.current_task_id.get() or "unattributed",
+            turn_number=context.current_turn_number.get(),
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            reasoning_tokens=0,
+            latency_ms=latency_ms,
+            estimated_cost=estimated_cost,
+            call_site=call_site,
+            db_path=db_path,
+        )
+    except Exception as e:
+        import sys
+        print(f"⚠️  Failed to record LLM telemetry: {e}", file=sys.stderr)
 
     return response_text

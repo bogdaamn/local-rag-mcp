@@ -9,12 +9,13 @@ Usage: python src/compare_sessions.py [--db-path PATH]
 import argparse
 
 from rich.console import Console
+from rich.table import Table
 
 from telemetry import storage
-from telemetry.dashboard import compute_comparison, render_comparison
+from telemetry.dashboard import compute_aggregate, compute_comparison, render_comparison
 
 # Metrics from compute_comparison() where a smaller value is the win.
-IMPROVES_WHEN_LOWER = {"Input tokens", "Output tokens", "Estimated cost", "Tool calls"}
+IMPROVES_WHEN_LOWER = {"Input tokens", "Output tokens", "Estimated cost", "Tool calls", "Total LLM calls"}
 # Metrics where a larger value is the win.
 IMPROVES_WHEN_HIGHER = {"Cache hit rate", "Cached tokens"}
 # Everything else (e.g. "Turns") is a control variable, not a scored metric.
@@ -66,6 +67,40 @@ def summarize_improvements(rows):
     return lines
 
 
+def render_call_site_breakdown(label, breakdown):
+    """breakdown: compute_aggregate()'s "call_site_breakdown" list, for one
+    session — shows which of the 3 LLM call sites the tokens/cost went to."""
+    table = Table(title=f"{label} — LLM calls by call site")
+    table.add_column("Call site")
+    table.add_column("Calls")
+    table.add_column("Input tokens")
+    table.add_column("Output tokens")
+    table.add_column("Cost")
+    for row in breakdown:
+        table.add_row(
+            row["call_site"], str(row["call_count"]),
+            str(row["input_tokens"]), str(row["output_tokens"]),
+            f"${row['estimated_cost']:.4f}",
+        )
+    return table
+
+
+def render_tool_breakdown(label, breakdown):
+    """breakdown: compute_aggregate()'s "tool_breakdown" list, for one
+    session — shows per-tool output size/tokens (not just duration)."""
+    table = Table(title=f"{label} — Tool usage")
+    table.add_column("Tool")
+    table.add_column("Calls")
+    table.add_column("Output size (B)")
+    table.add_column("Output tokens")
+    for row in breakdown:
+        table.add_row(
+            row["tool_name"], str(row["call_count"]),
+            str(row["total_output_size"]), str(row["total_output_tokens"]),
+        )
+    return table
+
+
 def main(db_path=None):
     tasks = find_oldest_and_newest_tasks(db_path)
     if tasks is None:
@@ -81,6 +116,17 @@ def main(db_path=None):
     print(f"\nOldest session: {oldest}\nNewest session: {newest}\n")
     for line in summarize_improvements(rows):
         print(f"  {line}")
+
+    agg_a = compute_aggregate(db_path, task_ids=[oldest])
+    agg_b = compute_aggregate(db_path, task_ids=[newest])
+
+    print()
+    console.print(render_call_site_breakdown(f"Session {oldest}", agg_a["call_site_breakdown"]))
+    console.print(render_call_site_breakdown(f"Session {newest}", agg_b["call_site_breakdown"]))
+
+    if agg_a["tool_breakdown"] or agg_b["tool_breakdown"]:
+        console.print(render_tool_breakdown(f"Session {oldest}", agg_a["tool_breakdown"]))
+        console.print(render_tool_breakdown(f"Session {newest}", agg_b["tool_breakdown"]))
 
 
 if __name__ == "__main__":

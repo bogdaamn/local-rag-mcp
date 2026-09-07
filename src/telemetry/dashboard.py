@@ -51,10 +51,21 @@ def compute_aggregate(db_path, task_ids=None):
 
         tool_breakdown = conn.execute(
             f"""
-            SELECT tool_name, COUNT(*), SUM(duration_ms), AVG(duration_ms)
+            SELECT tool_name, COUNT(*), SUM(duration_ms), AVG(duration_ms),
+                   SUM(output_size), SUM(output_tokens)
             FROM tool_calls {where_clause}
             GROUP BY tool_name
             ORDER BY SUM(duration_ms) DESC
+            """,
+            params,
+        ).fetchall()
+
+        call_site_breakdown = conn.execute(
+            f"""
+            SELECT call_site, COUNT(*), SUM(input_tokens), SUM(output_tokens), SUM(estimated_cost)
+            FROM llm_calls {where_clause}
+            GROUP BY call_site
+            ORDER BY SUM(estimated_cost) DESC
             """,
             params,
         ).fetchall()
@@ -77,10 +88,20 @@ def compute_aggregate(db_path, task_ids=None):
         "avg_turns_per_task": _safe_div(total_turns, tasks_completed),
         "avg_tool_calls_per_task": _safe_div(total_tool_calls, tasks_completed),
         "cache_hit_rate": _safe_div(cache_hits, total_llm_calls),
+        "total_llm_calls": total_llm_calls,
+        "call_site_breakdown": [
+            {
+                "call_site": row[0], "call_count": row[1],
+                "input_tokens": row[2], "output_tokens": row[3],
+                "estimated_cost": row[4],
+            }
+            for row in call_site_breakdown
+        ],
         "tool_breakdown": [
             {
                 "tool_name": row[0], "call_count": row[1],
                 "total_duration_ms": row[2], "avg_duration_ms": row[3],
+                "total_output_size": row[4], "total_output_tokens": row[5],
             }
             for row in tool_breakdown
         ],
@@ -99,6 +120,7 @@ def compute_comparison(db_path, task_id_a, task_id_b):
         ("Estimated cost", "estimated_cost"),
         ("Turns", "avg_turns_per_task"),
         ("Tool calls", "avg_tool_calls_per_task"),
+        ("Total LLM calls", "total_llm_calls"),
         ("Cache hit rate", "cache_hit_rate"),
     ]
 
@@ -127,22 +149,45 @@ def render_dashboard(aggregate):
     table.add_row("Avg turns/task", f"{aggregate['avg_turns_per_task']:.1f}")
     table.add_row("Avg tool calls/task", f"{aggregate['avg_tool_calls_per_task']:.1f}")
     table.add_row("Cache hit rate", f"{aggregate['cache_hit_rate'] * 100:.1f}%")
+    table.add_row("Total LLM calls", str(aggregate["total_llm_calls"]))
 
-    if not aggregate["tool_breakdown"]:
+    renderables = [table]
+
+    if aggregate["call_site_breakdown"]:
+        call_site_table = Table(title="LLM calls by call site")
+        call_site_table.add_column("Call site")
+        call_site_table.add_column("Calls")
+        call_site_table.add_column("Input tokens")
+        call_site_table.add_column("Output tokens")
+        call_site_table.add_column("Cost")
+        for row in aggregate["call_site_breakdown"]:
+            call_site_table.add_row(
+                row["call_site"], str(row["call_count"]),
+                str(row["input_tokens"]), str(row["output_tokens"]),
+                f"${row['estimated_cost']:.4f}",
+            )
+        renderables.append(call_site_table)
+
+    if aggregate["tool_breakdown"]:
+        breakdown_table = Table(title="Tool usage breakdown")
+        breakdown_table.add_column("Tool")
+        breakdown_table.add_column("Calls")
+        breakdown_table.add_column("Total duration (ms)")
+        breakdown_table.add_column("Avg duration (ms)")
+        breakdown_table.add_column("Output size (B)")
+        breakdown_table.add_column("Output tokens")
+        for row in aggregate["tool_breakdown"]:
+            breakdown_table.add_row(
+                row["tool_name"], str(row["call_count"]),
+                f"{row['total_duration_ms']:.1f}", f"{row['avg_duration_ms']:.1f}",
+                str(row["total_output_size"]), str(row["total_output_tokens"]),
+            )
+        renderables.append(breakdown_table)
+
+    if len(renderables) == 1:
         return table
 
-    breakdown_table = Table(title="Tool usage breakdown")
-    breakdown_table.add_column("Tool")
-    breakdown_table.add_column("Calls")
-    breakdown_table.add_column("Total duration (ms)")
-    breakdown_table.add_column("Avg duration (ms)")
-    for row in aggregate["tool_breakdown"]:
-        breakdown_table.add_row(
-            row["tool_name"], str(row["call_count"]),
-            f"{row['total_duration_ms']:.1f}", f"{row['avg_duration_ms']:.1f}",
-        )
-
-    return Group(table, breakdown_table)
+    return Group(*renderables)
 
 
 def _format_metric_value(metric, value):

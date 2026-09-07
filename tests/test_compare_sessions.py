@@ -133,3 +133,23 @@ def test_main_prints_per_session_breakdowns(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "mcp_decision" in out
     assert "ask_llm" in out
+
+
+def test_main_labels_each_session_with_start_time_and_turn_count(tmp_path, capsys):
+    db_path = tmp_path / "telemetry.db"
+    _seed(db_path, "oldest", "2026-09-06T10:00:00")
+    _seed(db_path, "newest", "2026-09-06T14:00:00")
+    storage.insert_llm_call(
+        agent_id="a", task_id="newest", turn_number=2, model="qwen3:0.6b",
+        input_tokens=1, output_tokens=1, cached_tokens=0, reasoning_tokens=0,
+        latency_ms=1.0, estimated_cost=0.0, call_site="ask_llm",
+        timestamp="2026-09-06T14:05:00", db_path=db_path,
+    )
+
+    compare_sessions.main(db_path)
+
+    out = capsys.readouterr().out
+    assert "2026-09-06T10:00:00" in out
+    assert "1 turn" in out          # oldest: single seeded call, 1 turn
+    assert "2026-09-06T14:00:00" in out
+    assert "2 turns" in out         # newest: turn 1 and turn 2

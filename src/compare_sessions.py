@@ -40,6 +40,28 @@ def find_oldest_and_newest_tasks(db_path=None):
     return rows[0][0], rows[-1][0]
 
 
+def _first_seen(db_path, task_id):
+    conn = storage.get_connection(db_path)
+    try:
+        row = conn.execute(
+            "SELECT MIN(timestamp) FROM llm_calls WHERE task_id = ?", (task_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    return row[0]
+
+
+def _session_label(db_path, task_id, aggregate):
+    """One line identifying a session: id, when it started, how many
+    questions (turns) it covered — the context a bare task_id lacks, and
+    the exact thing that made an earlier 8-question vs. 1-question
+    comparison look like a false "improvement"."""
+    started = _first_seen(db_path, task_id)
+    turns = int(aggregate["avg_turns_per_task"])  # single-task scope: this *is* the task's turn count
+    plural = "s" if turns != 1 else ""
+    return f"{task_id} (started {started}, {turns} turn{plural})"
+
+
 def _pct_change(before, after):
     if before == 0:
         return None
@@ -110,15 +132,16 @@ def main(db_path=None):
     oldest, newest = tasks
     rows = compute_comparison(db_path, oldest, newest)
 
+    agg_a = compute_aggregate(db_path, task_ids=[oldest])
+    agg_b = compute_aggregate(db_path, task_ids=[newest])
+
     console = Console()
     console.print(render_comparison(rows, oldest, newest))
 
-    print(f"\nOldest session: {oldest}\nNewest session: {newest}\n")
+    print(f"\nOldest session: {_session_label(db_path, oldest, agg_a)}")
+    print(f"Newest session: {_session_label(db_path, newest, agg_b)}\n")
     for line in summarize_improvements(rows):
         print(f"  {line}")
-
-    agg_a = compute_aggregate(db_path, task_ids=[oldest])
-    agg_b = compute_aggregate(db_path, task_ids=[newest])
 
     print()
     console.print(render_call_site_breakdown(f"Session {oldest}", agg_a["call_site_breakdown"]))

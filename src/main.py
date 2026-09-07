@@ -57,6 +57,8 @@ def _run_timeline(task_id):
 
 def _run_interactive():
     from assistant import CompanyKBAssistant
+    from telemetry import context
+    from telemetry.turn_summary import compute_turn_summary, format_turn_summary
     assistant = CompanyKBAssistant()
 
     print("=" * 60)
@@ -92,6 +94,10 @@ def _run_interactive():
 
                 if result["mcp_used"]:
                     print(f"\n🔧 Used MCP tool: {result['mcp_tool']}")
+
+                turn_number = context.current_turn_number.get()
+                summary = compute_turn_summary(None, assistant.task_id, turn_number)
+                print(f"\n📊 {format_turn_summary(summary)}")
 
             except Exception as e:
                 print(f"❌ Error: {e}")

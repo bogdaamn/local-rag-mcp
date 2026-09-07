@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from rag.query import retrieve, build_prompt, ask_llm
 from mcp.client import MCPClient
 from config import OLLAMA_MODEL
+from telemetry import context
+from telemetry.llm_middleware import record_llm_call
 
 class CompanyKBAssistant:
     """Company Knowledge Base Assistant combining RAG and MCP."""
@@ -17,6 +19,7 @@ class CompanyKBAssistant:
     def __init__(self):
         self.llm_client = ollama.Client()
         self.mcp = None
+        self.task_id = context.start_task()
         self._init_mcp()
         
     def _init_mcp(self):
@@ -75,7 +78,7 @@ Examples:
 
 Your JSON response:"""
 
-        try:
+        def _do_chat():
             response = self.llm_client.chat(
                 model=OLLAMA_MODEL,
                 messages=[
@@ -83,16 +86,29 @@ Your JSON response:"""
                     {"role": "user", "content": decision_prompt}
                 ]
             )
-            
-            response_text = response["message"]["content"].strip()
-            
+            return (
+                response["message"]["content"],
+                response.get("prompt_eval_count", 0),
+                response.get("eval_count", 0),
+            )
+
+        try:
+            response_text = record_llm_call(
+                call_site="mcp_decision",
+                model=OLLAMA_MODEL,
+                prompt=decision_prompt,
+                temperature=None,
+                fn=_do_chat,
+            )
+            response_text = response_text.strip()
+
             # Clean up JSON if wrapped in markdown
             if response_text.startswith("```"):
                 response_text = response_text.split("```")[1]
                 if response_text.startswith("json"):
                     response_text = response_text[4:]
                 response_text = response_text.strip()
-            
+
             decision = json.loads(response_text)
             
             if decision.get("use_mcp", False):
@@ -119,6 +135,7 @@ Your JSON response:"""
     
     def query(self, user_query: str, verbose=False):
         """Answer a question using RAG and optionally MCP tools."""
+        context.next_turn()
         # Step 1: Retrieve from RAG
         contexts = retrieve(user_query)
         

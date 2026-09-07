@@ -26,3 +26,7 @@ FTS_DB_PATH = "fts.db"          # relative to src dir, mirrors FAISS_INDEX_PATH
 RRF_K = 60                       # RRF constant k, per assignment's formula
 NUM_QUERY_EXPANSIONS = 3         # max alternative phrases the LLM may produce
 CANDIDATE_K = TOP_K * 3          # candidate pool size per method, before fusion
+
+# Telemetry configuration
+TELEMETRY_DB_PATH = "telemetry.db"   # relative to src dir, mirrors FTS_DB_PATH
+AGENT_ID = "company-kb-assistant"

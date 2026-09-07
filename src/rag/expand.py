@@ -29,7 +29,7 @@ def generate_keywords(query, ask_llm_fn=None):
 
     prompt = PROMPT_TEMPLATE.format(query=query)
     try:
-        response = ask_llm_fn(prompt, temperature=0.1, timeout=8.0)
+        response = ask_llm_fn(prompt, temperature=0.1, timeout=8.0, call_site="query_expansion")
     except Exception:
         return []
 

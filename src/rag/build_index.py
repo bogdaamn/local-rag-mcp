@@ -14,6 +14,11 @@ from config import FAISS_INDEX_PATH, CHUNKS_PATH
 
 def build_index():
     """Build FAISS index from documents."""
+    from telemetry import llm_cache
+    llm_cache.clear()  # a rebuilt index can change which chunks are
+                        # retrieved, invalidating any cached answer for the
+                        # same normalized question text
+
     # Resolve paths relative to src directory
     src_dir = Path(__file__).parent.parent
     index_path = src_dir / FAISS_INDEX_PATH

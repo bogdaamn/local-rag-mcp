@@ -22,6 +22,7 @@ from config import (
 from rag.fusion import rrf_fuse
 from rag.fts_index import search_fts
 from rag.expand import generate_keywords
+from telemetry.llm_middleware import record_llm_call
 from concurrent.futures import ThreadPoolExecutor
 
 model = SentenceTransformer(EMBEDDING_MODEL)
@@ -170,18 +171,33 @@ def build_prompt(query, contexts):
 """
 
 
-def ask_llm(prompt, temperature=None, timeout=None):
-    """Query Ollama LLM.
+def ask_llm(prompt, temperature=None, timeout=None, call_site="ask_llm"):
+    """Query Ollama LLM through the telemetry middleware (cache lookup,
+    timing, cost estimation, and a recorded llm_calls row) — see
+    telemetry.llm_middleware.record_llm_call.
 
     temperature: if not None, sent as {"options": {"temperature": temperature}}.
     timeout: if not None, passed as requests.post(..., timeout=timeout).
              If None, blocks indefinitely (unchanged existing behavior).
+    call_site: which of the spec's 3 tagged LLM call sites this is. Defaults
+    to "ask_llm" (the direct final-answer call from ask()); generate_keywords()
+    in rag/expand.py overrides it to "query_expansion".
     """
-    payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}
-    if temperature is not None:
-        payload["options"] = {"temperature": temperature}
-    response = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
-    return response.json()["response"]
+    def _do_request():
+        payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}
+        if temperature is not None:
+            payload["options"] = {"temperature": temperature}
+        response = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
+        data = response.json()
+        return data["response"], data.get("prompt_eval_count", 0), data.get("eval_count", 0)
+
+    return record_llm_call(
+        call_site=call_site,
+        model=OLLAMA_MODEL,
+        prompt=prompt,
+        temperature=temperature,
+        fn=_do_request,
+    )
 
 
 def ask(query: str):

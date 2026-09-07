@@ -6,6 +6,7 @@ import faiss
 
 import rag.build_index as build_index_module
 from rag.fts_index import search_fts
+from telemetry import llm_cache
 
 
 def test_build_index_writes_faiss_idmap_chunks_and_fts_index(tmp_path, monkeypatch):
@@ -43,3 +44,23 @@ def test_build_index_writes_faiss_idmap_chunks_and_fts_index(tmp_path, monkeypat
     assert loaded_chunks == fake_chunks
 
     assert search_fts(fts_db_path, "invoice", top_k=10) == [0]
+
+
+def test_build_index_clears_llm_cache(tmp_path, monkeypatch):
+    fake_docs = [{"path": "doc.txt", "text": "irrelevant"}]
+    fake_chunks = [{"id": 0, "text": "invoice", "source": "doc.txt", "chunk_id": 0}]
+    fake_embeddings = np.array([[1.0, 0.0]], dtype="float32")
+
+    monkeypatch.setattr(build_index_module, "ingest_documents", lambda: fake_docs)
+    monkeypatch.setattr(build_index_module, "chunk_documents", lambda docs: fake_chunks)
+    monkeypatch.setattr(build_index_module, "embed_chunks", lambda chunks: fake_embeddings)
+    monkeypatch.setattr(build_index_module, "FAISS_INDEX_PATH", str(tmp_path / "index.faiss"))
+    monkeypatch.setattr(build_index_module, "CHUNKS_PATH", str(tmp_path / "chunks.pkl"))
+    monkeypatch.setattr("config.FTS_DB_PATH", str(tmp_path / "fts.db"))
+
+    llm_cache.put("some prompt", "qwen3:0.6b", None, "cached answer", 10, 5)
+    assert llm_cache.get("some prompt", "qwen3:0.6b", None) is not None
+
+    build_index_module.build_index()
+
+    assert llm_cache.get("some prompt", "qwen3:0.6b", None) is None

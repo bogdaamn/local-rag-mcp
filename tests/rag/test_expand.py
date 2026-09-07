@@ -58,4 +58,17 @@ def test_calls_ask_llm_fn_with_query_in_prompt_and_low_temperature_and_timeout()
     generate_keywords("my search question", ask_llm_fn=fake_ask_llm)
 
     assert "my search question" in captured["prompt"]
-    assert captured["kwargs"] == {"temperature": 0.1, "timeout": 8.0}
+    assert captured["kwargs"]["temperature"] == 0.1
+    assert captured["kwargs"]["timeout"] == 8.0
+
+
+def test_passes_query_expansion_call_site_to_ask_llm_fn():
+    captured = {}
+
+    def fake_ask_llm(prompt, **kwargs):
+        captured["kwargs"] = kwargs
+        return "keyword"
+
+    generate_keywords("q", ask_llm_fn=fake_ask_llm)
+
+    assert captured["kwargs"]["call_site"] == "query_expansion"

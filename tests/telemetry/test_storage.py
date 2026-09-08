@@ -88,3 +88,97 @@ def test_insert_tool_call_writes_a_row(tmp_path):
     conn.close()
 
     assert row == ("company-kb-assistant", "t1", 2, "list_documents", 2, 50, 12)
+
+
+def test_get_connection_creates_session_memory_table(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+
+    conn = storage.get_connection(db_path)
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    conn.close()
+
+    assert "session_memory" in tables
+
+
+def test_get_connection_adds_truncated_column_to_a_pre_existing_tool_calls_table(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    # Simulate a DB created before this migration: tool_calls without `truncated`.
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """
+        CREATE TABLE tool_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            turn_number INTEGER NOT NULL,
+            tool_name TEXT NOT NULL,
+            input_size INTEGER NOT NULL,
+            output_size INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            duration_ms REAL NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    conn = storage.get_connection(db_path)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(tool_calls)")}
+    conn.close()
+
+    assert "truncated" in columns
+
+
+def test_insert_tool_call_defaults_truncated_to_false(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+
+    storage.insert_tool_call(
+        agent_id="a", task_id="t1", turn_number=1, tool_name="read_document",
+        input_size=1, output_size=1, output_tokens=1, duration_ms=1.0, db_path=db_path,
+    )
+
+    conn = sqlite3.connect(str(db_path))
+    truncated = conn.execute("SELECT truncated FROM tool_calls").fetchone()[0]
+    conn.close()
+    assert truncated == 0
+
+
+def test_insert_tool_call_stores_truncated_true(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+
+    storage.insert_tool_call(
+        agent_id="a", task_id="t1", turn_number=1, tool_name="read_document",
+        input_size=1, output_size=1, output_tokens=1, duration_ms=1.0,
+        truncated=True, db_path=db_path,
+    )
+
+    conn = sqlite3.connect(str(db_path))
+    truncated = conn.execute("SELECT truncated FROM tool_calls").fetchone()[0]
+    conn.close()
+    assert truncated == 1
+
+
+def test_upsert_session_memory_then_get_roundtrips(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+
+    storage.upsert_session_memory("t1", '{"a": 1}', db_path=db_path)
+
+    assert storage.get_session_memory("t1", db_path=db_path) == '{"a": 1}'
+
+
+def test_upsert_session_memory_overwrites_existing_row(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+
+    storage.upsert_session_memory("t1", '{"a": 1}', db_path=db_path)
+    storage.upsert_session_memory("t1", '{"a": 2}', db_path=db_path)
+
+    assert storage.get_session_memory("t1", db_path=db_path) == '{"a": 2}'
+
+
+def test_get_session_memory_returns_none_when_absent(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    assert storage.get_session_memory("missing", db_path=db_path) is None

@@ -190,6 +190,15 @@ def render_dashboard(aggregate):
     return Group(*renderables)
 
 
+def pct_change(before, after):
+    """Signed percentage change from `before` to `after`, or None (n/a)
+    when `before` is 0 — a percentage relative to zero is undefined, not
+    infinite or zero."""
+    if before == 0:
+        return None
+    return (after - before) / abs(before) * 100
+
+
 def _format_metric_value(metric, value):
     if metric == "Estimated cost":
         return f"${value:.4f}"
@@ -206,15 +215,19 @@ def render_comparison(rows, task_id_a, task_id_b):
     table.add_column(f"Session {task_id_a}")
     table.add_column(f"Session {task_id_b}")
     table.add_column("Δ")
+    table.add_column("Δ %")
 
     for row in rows:
         delta = row["delta"]
         sign = "+" if delta > 0 else ""
+        pct = pct_change(row["session_a"], row["session_b"])
+        pct_text = f"{pct:+.1f}%" if pct is not None else "n/a"
         table.add_row(
             row["metric"],
             _format_metric_value(row["metric"], row["session_a"]),
             _format_metric_value(row["metric"], row["session_b"]),
             f"{sign}{_format_metric_value(row['metric'], delta)}",
+            pct_text,
         )
 
     return table

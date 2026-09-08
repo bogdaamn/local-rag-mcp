@@ -220,6 +220,42 @@ Type 'exit' to stop
 [Full document content...]
 ```
 
+# 📊 Telemetry, Dashboard & Session Comparison
+
+Every LLM call and MCP tool call is recorded locally in `src/telemetry.db`
+(SQLite — never leaves the machine). Three ways to look at it:
+
+**Aggregate dashboard** — tokens, cost, cache hit rate, per-call-site and
+per-tool breakdowns, across all history or a subset:
+
+```bash
+venv/bin/python src/main.py dashboard
+venv/bin/python src/main.py dashboard --tasks <task_id_1>,<task_id_2>
+venv/bin/python src/main.py dashboard --compare <task_id_A> <task_id_B>
+```
+
+`--compare` prints a 5-column table (`Metric | Session A | Session B | Δ | Δ %`).
+
+**Session comparison tool** — same comparison, plus a session picker so you
+don't need to know task_ids by heart:
+
+```bash
+venv/bin/python src/compare_sessions.py            # compares the oldest vs. newest recorded session
+venv/bin/python src/compare_sessions.py --select   # numbered list of every session; pick two by index
+```
+
+Output: the same delta table, a per-metric improved/regressed/unchanged
+verdict, and a per-call-site and per-tool breakdown for each session.
+
+**Per-task timeline** — turn-by-turn detail for one session:
+
+```bash
+venv/bin/python src/main.py timeline <task_id>
+```
+
+Every interactive run prints its own `task_id` at startup — that's what you
+pass to any of the commands above.
+
 # 🔐 Security - Local vs Cloud
 
 **Cloud**: Data → Internet → Server
@@ -236,7 +272,7 @@ Type 'exit' to stop
 
 - **MCP Sandbox**: Prevents path traversal
 - **Local Storage**: Documents stay on device
-- **No Telemetry**: No tracking
+- **Local-Only Telemetry**: LLM/tool call metrics stay in `src/telemetry.db`, never sent anywhere
 - **Offline Ready**: Works without internet
 
 # ⚡ Performance Benchmarks

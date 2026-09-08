@@ -30,3 +30,7 @@ CANDIDATE_K = TOP_K * 3          # candidate pool size per method, before fusion
 # Telemetry configuration
 TELEMETRY_DB_PATH = "telemetry.db"   # relative to src dir, mirrors FTS_DB_PATH
 AGENT_ID = "company-kb-assistant"
+
+# Token-efficiency: default output budget for read_document (chars, not tokens —
+# no tokenizer is available for arbitrary document text; see spec/v3/SPEC.md)
+READ_DOCUMENT_MAX_CHARS = 4000

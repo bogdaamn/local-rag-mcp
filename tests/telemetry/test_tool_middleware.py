@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 from telemetry import context
@@ -72,3 +73,58 @@ def test_records_and_does_not_raise_when_no_ambient_task(tmp_path):
     task_id = conn.execute("SELECT task_id FROM tool_calls").fetchone()[0]
     conn.close()
     assert task_id == "unattributed"
+
+
+def test_records_truncated_true_when_result_json_says_so(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    context.start_task("t4")
+    context.next_turn()
+
+    record_tool_call(
+        "read_document", {"file_path": "docs/sqlite.txt"},
+        lambda: {"result": json.dumps({
+            "content": "partial...", "truncated": True,
+            "total_chars": 9000, "next_offset": 4000,
+        })},
+        db_path=db_path,
+    )
+
+    conn = sqlite3.connect(str(db_path))
+    truncated = conn.execute("SELECT truncated FROM tool_calls").fetchone()[0]
+    conn.close()
+    assert truncated == 1
+
+
+def test_records_truncated_false_when_result_json_says_so(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    context.start_task("t5")
+    context.next_turn()
+
+    record_tool_call(
+        "read_document", {"file_path": "docs/sqlite.txt"},
+        lambda: {"result": json.dumps({
+            "content": "whole file", "truncated": False,
+            "total_chars": 10, "next_offset": None,
+        })},
+        db_path=db_path,
+    )
+
+    conn = sqlite3.connect(str(db_path))
+    truncated = conn.execute("SELECT truncated FROM tool_calls").fetchone()[0]
+    conn.close()
+    assert truncated == 0
+
+
+def test_records_truncated_false_for_plain_string_results(tmp_path):
+    db_path = tmp_path / "telemetry.db"
+    context.start_task("t6")
+    context.next_turn()
+
+    record_tool_call(
+        "list_documents", {}, lambda: {"result": "doc1\ndoc2"}, db_path=db_path,
+    )
+
+    conn = sqlite3.connect(str(db_path))
+    truncated = conn.execute("SELECT truncated FROM tool_calls").fetchone()[0]
+    conn.close()
+    assert truncated == 0

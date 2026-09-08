@@ -7,6 +7,7 @@ from telemetry.dashboard import (
     compute_comparison,
     render_dashboard,
     render_comparison,
+    pct_change,
 )
 
 
@@ -246,3 +247,33 @@ def test_render_comparison_includes_session_ids_and_delta_column():
     assert "t1" in text
     assert "t2" in text
     assert "Input tokens" in text
+
+
+def test_render_comparison_includes_percent_delta_column():
+    rows = [{"metric": "Input tokens", "session_a": 100, "session_b": 150, "delta": 50}]
+
+    console = Console(record=True, width=120)
+    console.print(render_comparison(rows, "t1", "t2"))
+    text = console.export_text()
+
+    assert "Δ %" in text
+    assert "+50.0%" in text
+
+
+def test_render_comparison_percent_delta_is_na_when_session_a_is_zero():
+    rows = [{"metric": "Cached tokens", "session_a": 0, "session_b": 0, "delta": 0}]
+
+    console = Console(record=True, width=120)
+    console.print(render_comparison(rows, "t1", "t2"))
+    text = console.export_text()
+
+    assert "n/a" in text
+
+
+def test_pct_change_computes_signed_percentage():
+    assert pct_change(100, 150) == 50.0
+    assert pct_change(100, 50) == -50.0
+
+
+def test_pct_change_returns_none_when_before_is_zero():
+    assert pct_change(0, 10) is None

@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from telemetry import storage
-from telemetry.dashboard import compute_aggregate, compute_comparison, render_comparison
+from telemetry.dashboard import compute_aggregate, compute_comparison, render_comparison, pct_change
 
 # Metrics from compute_comparison() where a smaller value is the win.
 IMPROVES_WHEN_LOWER = {"Input tokens", "Output tokens", "Estimated cost", "Tool calls", "Total LLM calls"}
@@ -136,19 +136,13 @@ def _session_label(db_path, task_id, aggregate):
     return f"{task_id} (started {started}, {turns} turn{plural})"
 
 
-def _pct_change(before, after):
-    if before == 0:
-        return None
-    return (after - before) / abs(before) * 100
-
-
 def summarize_improvements(rows):
     """rows: compute_comparison()'s output. Returns one human-readable
     line per metric, tagged improved/regressed/unchanged/info."""
     lines = []
     for row in rows:
         metric, before, after, delta = row["metric"], row["session_a"], row["session_b"], row["delta"]
-        pct = _pct_change(before, after)
+        pct = pct_change(before, after)
         pct_text = f"{pct:+.1f}%" if pct is not None else "n/a"
 
         if metric in IMPROVES_WHEN_LOWER:

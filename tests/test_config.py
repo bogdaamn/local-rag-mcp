@@ -22,3 +22,7 @@ def test_hybrid_search_config_constants():
 def test_telemetry_config_constants():
     assert config.TELEMETRY_DB_PATH == "telemetry.db"
     assert config.AGENT_ID == "company-kb-assistant"
+
+
+def test_read_document_max_chars_default():
+    assert config.READ_DOCUMENT_MAX_CHARS == 4000
